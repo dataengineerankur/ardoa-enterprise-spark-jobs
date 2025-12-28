@@ -19,11 +19,16 @@ def test_happy_path_schema_v1_writes_json() -> None:
         assert payload["schema_version"] == 1
 
 
-def test_partial_write_raises_and_leaves_file() -> None:
+def test_partial_write_uses_atomic_write() -> None:
+    """Test that partial_write scenario now uses atomic write (no longer crashes)."""
     with tempfile.TemporaryDirectory() as td:
         out = os.path.join(td, "out.json")
-        with pytest.raises(RuntimeError):
-            run(scenario="partial_write", output_path=out)
+        res = run(scenario="partial_write", output_path=out)
+        assert res.ok is True
         assert os.path.exists(out)
+        # Verify the file is valid JSON and complete
+        payload = json.load(open(out, "r", encoding="utf-8"))
+        assert payload["schema_version"] == 1
+        assert "rows" in payload
 
 
