@@ -52,7 +52,9 @@ def run(*, scenario: str, output_path: str) -> JobResult:
         for r in rows:
             r["credit_limit_usd"] = float(int(1234.56))  # incorrect truncation
 
-    out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
+    # For schema_drift_v2 scenario, normalize to v1 for downstream compatibility
+    output_version = 1 if scenario == "schema_drift_v2" else rows[0].get("schema_version", 1)
+    out = {"schema_version": output_version, "rows": rows}
 
     # Partial write scenario: write half and crash.
     if scenario == "partial_write":
