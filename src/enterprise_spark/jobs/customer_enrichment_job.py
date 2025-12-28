@@ -54,17 +54,7 @@ def run(*, scenario: str, output_path: str) -> JobResult:
 
     out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
 
-    # Partial write scenario: write half and crash.
-    if scenario == "partial_write":
-        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-        blob = json.dumps(out, indent=2)
-        half = blob[: max(1, len(blob) // 2)]
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(half)
-            f.flush()
-        raise RuntimeError("Simulated crash during write (partial output emitted)")
-
-    # Normal path: atomic write.
+    # Always use atomic write to prevent partial outputs.
     res = atomic_write_text(output_path, json.dumps(out, indent=2))
     if not res.ok:
         raise RuntimeError(f"Failed to write output atomically: {output_path}")
