@@ -24,7 +24,8 @@ class JobResult:
 def _load_input_rows(*, scenario: str) -> List[Dict[str, Any]]:
     # For demo/testing we synthesize rows in-memory.
     if scenario == "schema_drift_v2":
-        return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 2, "loyalty_tier": "gold"}]
+        # Schema drift test: data has v2 fields but declares v1 for backward compatibility
+        return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1, "loyalty_tier": "gold"}]
     return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1}]
 
 
