@@ -52,6 +52,12 @@ def run(*, scenario: str, output_path: str) -> JobResult:
         for r in rows:
             r["credit_limit_usd"] = float(int(1234.56))  # incorrect truncation
 
+    # Missing column scenario: simulate accessing a column that doesn't exist.
+    if scenario == "spark_missing_column":
+        # This simulates a common Spark error where code references a column not in the DataFrame.
+        for r in rows:
+            _ = r["region"]  # This column doesn't exist in the input data
+
     out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
 
     # Partial write scenario: write half and crash.
