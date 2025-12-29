@@ -27,3 +27,14 @@ def test_partial_write_raises_and_leaves_file() -> None:
         assert os.path.exists(out)
 
 
+def test_spark_missing_column_handles_gracefully() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "out.json")
+        res = run(scenario="spark_missing_column", output_path=out)
+        assert res.ok is True
+        assert os.path.exists(out)
+        payload = json.load(open(out, "r", encoding="utf-8"))
+        assert payload["schema_version"] == 1
+        assert len(payload["rows"]) == 1
+
+
