@@ -43,6 +43,11 @@ def run(*, scenario: str, output_path: str) -> JobResult:
             raise RuntimeError("Upstream enrichment API returned 429 Too Many Requests")
         time.sleep(0.15)
 
+    # Simulate missing column error in Spark.
+    if scenario == "spark_missing_column":
+        for r in rows:
+            _ = r["nonexistent_column"]
+
     # Contract validation (shared lib). This is where schema drift shows up.
     validate_customer_rows(rows=rows)
 
