@@ -25,6 +25,9 @@ def _load_input_rows(*, scenario: str) -> List[Dict[str, Any]]:
     # For demo/testing we synthesize rows in-memory.
     if scenario == "schema_drift_v2":
         return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 2, "loyalty_tier": "gold"}]
+    if scenario == "spark_missing_column":
+        # Provide all required columns with placeholder for missing email
+        return [{"id": 1, "email": "", "country": "US", "schema_version": 1}]
     return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1}]
 
 
