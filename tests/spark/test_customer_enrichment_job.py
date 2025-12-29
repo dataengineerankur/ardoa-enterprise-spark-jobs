@@ -27,3 +27,10 @@ def test_partial_write_raises_and_leaves_file() -> None:
         assert os.path.exists(out)
 
 
+def test_spark_missing_column_raises_key_error() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "out.json")
+        with pytest.raises(KeyError):
+            run(scenario="spark_missing_column", output_path=out)
+
+
