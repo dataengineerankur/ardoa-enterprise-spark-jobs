@@ -64,6 +64,15 @@ def run(*, scenario: str, output_path: str) -> JobResult:
             f.flush()
         raise RuntimeError("Simulated crash during write (partial output emitted)")
 
+    # Corrupt JSON scenario: write invalid JSON.
+    if scenario == "corrupt_json":
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        corrupted = json.dumps(out, indent=2)[:-10] + "CORRUPT"
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(corrupted)
+            f.flush()
+        return JobResult(ok=True, output_path=output_path, row_count=len(rows), notes="corrupt_json_injected")
+
     # Normal path: atomic write.
     res = atomic_write_text(output_path, json.dumps(out, indent=2))
     if not res.ok:
