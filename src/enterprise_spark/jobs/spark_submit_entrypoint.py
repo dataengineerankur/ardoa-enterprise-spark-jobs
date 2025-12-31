@@ -43,7 +43,7 @@ def main() -> None:
     # Intentional spark failure scenario (real Spark AnalysisException).
     # This mimics a common production issue: selecting a column that doesn't exist due to drift/typo.
     if scenario == "spark_missing_column":
-        df = df.select("id", "email", "cntry")  # BUG: should be "country"
+        df = df.select("id", "email", "country")
         # Trigger evaluation
         _ = df.count()
 
