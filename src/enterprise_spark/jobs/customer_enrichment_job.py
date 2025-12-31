@@ -54,6 +54,15 @@ def run(*, scenario: str, output_path: str) -> JobResult:
 
     out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
 
+    # Corrupt JSON scenario: write syntactically invalid JSON.
+    if scenario == "corrupt_json":
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        corrupt = '{"schema_version": 1, "rows": [{"id": 1, "email": "a@example.com",}'
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(corrupt)
+            f.flush()
+        raise RuntimeError("Simulated corrupt JSON write")
+
     # Partial write scenario: write half and crash.
     if scenario == "partial_write":
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
