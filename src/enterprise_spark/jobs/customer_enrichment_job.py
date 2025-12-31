@@ -64,6 +64,16 @@ def run(*, scenario: str, output_path: str) -> JobResult:
             f.flush()
         raise RuntimeError("Simulated crash during write (partial output emitted)")
 
+    # Corrupt JSON scenario: write syntactically invalid JSON.
+    if scenario == "corrupt_json":
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        corrupt_json = '{"schema_version": 1, "rows": [{"id": 1, "email": "a@example.com",}]}'  # trailing comma = invalid JSON
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(corrupt_json)
+            f.flush()
+        # Job completes "successfully" but output is corrupt (silent data quality issue)
+        return JobResult(ok=True, output_path=output_path, row_count=len(rows), notes="corrupt_json_scenario")
+
     # Normal path: atomic write.
     res = atomic_write_text(output_path, json.dumps(out, indent=2))
     if not res.ok:
