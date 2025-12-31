@@ -25,6 +25,13 @@ def _load_input_rows(*, scenario: str) -> List[Dict[str, Any]]:
     # For demo/testing we synthesize rows in-memory.
     if scenario == "schema_drift_v2":
         return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 2, "loyalty_tier": "gold"}]
+    if scenario in {"silent_data_corruption", "idempotency_bug"}:
+        # Simulate multiple input rows with unique IDs (fixed: was creating duplicates)
+        return [
+            {"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1},
+            {"id": 2, "email": "b@example.com", "country": "CA", "schema_version": 1},
+            {"id": 3, "email": "c@example.com", "country": "UK", "schema_version": 1},
+        ]
     return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1}]
 
 
@@ -68,6 +75,15 @@ def run(*, scenario: str, output_path: str) -> JobResult:
     res = atomic_write_text(output_path, json.dumps(out, indent=2))
     if not res.ok:
         raise RuntimeError(f"Failed to write output atomically: {output_path}")
+
+    # Silent data corruption scenario: schema-valid output, but duplicates should not exist.
+    if scenario in {"silent_data_corruption", "idempotency_bug"}:
+        ids: list[int] = []
+        for r in out["rows"]:
+            if isinstance(r, dict) and isinstance(r.get("id"), int):
+                ids.append(int(r["id"]))
+        if len(ids) != len(set(ids)):
+            raise RuntimeError("Data quality failure: duplicate primary keys detected (idempotency/corruption)")
 
     # Type hints used by downstream (kept realistic).
     if out["schema_version"] == 2:
