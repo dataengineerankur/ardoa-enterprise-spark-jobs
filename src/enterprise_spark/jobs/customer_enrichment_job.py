@@ -25,6 +25,18 @@ def _load_input_rows(*, scenario: str) -> List[Dict[str, Any]]:
     # For demo/testing we synthesize rows in-memory.
     if scenario == "schema_drift_v2":
         return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 2, "loyalty_tier": "gold"}]
+    if scenario == "silent_data_corruption":
+        # Schema-valid but semantically wrong: duplicate primary keys (idempotency/corruption).
+        return [
+            {"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1},
+            {"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1},
+        ]
+    if scenario == "idempotency_bug":
+        # Normal rows; the idempotency bug is in how we write/merge output below.
+        return [
+            {"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1},
+            {"id": 2, "email": "b@example.com", "country": "CA", "schema_version": 1},
+        ]
     return [{"id": 1, "email": "a@example.com", "country": "US", "schema_version": 1}]
 
 
@@ -54,6 +66,15 @@ def run(*, scenario: str, output_path: str) -> JobResult:
 
     out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
 
+    # Silent data corruption scenario: schema-valid output, but duplicates should not exist.
+    if scenario in {"silent_data_corruption", "idempotency_bug"}:
+        ids: list[int] = []
+        for r in out["rows"]:
+            if isinstance(r, dict) and isinstance(r.get("id"), int):
+                ids.append(int(r["id"]))
+        if len(ids) != len(set(ids)):
+            raise RuntimeError("Data quality failure: duplicate primary keys detected (idempotency/corruption)")
+
     # Partial write scenario: write half and crash.
     if scenario == "partial_write":
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -63,6 +84,32 @@ def run(*, scenario: str, output_path: str) -> JobResult:
             f.write(half)
             f.flush()
         raise RuntimeError("Simulated crash during write (partial output emitted)")
+
+    # Corrupt JSON scenario: write invalid JSON but do not crash (downstream consumer should fail parsing).
+    if scenario == "corrupt_json":
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        atomic_write_text(output_path, "{ this_is: not-json }")
+        return JobResult(ok=True, output_path=output_path, row_count=len(rows), notes="wrote_corrupt_json")
+
+    # Idempotency bug scenario: if output already exists, accidentally duplicate rows by "merging" incorrectly.
+    if scenario == "idempotency_bug" and os.path.exists(output_path):
+        try:
+            existing = json.load(open(output_path, "r", encoding="utf-8"))
+            existing_rows = existing.get("rows") or []
+            if isinstance(existing_rows, list):
+                out["rows"] = list(existing_rows) + list(out["rows"])
+        except Exception:
+            # If prior output is corrupt, we let downstream fail; this is realistic.
+            pass
+
+    # Corrupt JSON scenario: write invalid JSON.
+    if scenario == "corrupt_json":
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        corrupted = json.dumps(out, indent=2)[:-10] + "CORRUPT"
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(corrupted)
+            f.flush()
+        return JobResult(ok=True, output_path=output_path, row_count=len(rows), notes="corrupt_json_injected")
 
     # Normal path: atomic write.
     res = atomic_write_text(output_path, json.dumps(out, indent=2))
