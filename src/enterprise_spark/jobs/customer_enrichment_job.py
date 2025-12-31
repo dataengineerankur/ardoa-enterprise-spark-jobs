@@ -52,6 +52,11 @@ def run(*, scenario: str, output_path: str) -> JobResult:
         for r in rows:
             r["credit_limit_usd"] = float(int(1234.56))  # incorrect truncation
 
+    # Silent data corruption scenario: duplicate primary keys (idempotency bug).
+    if scenario == "silent_data_corruption":
+        # Simulate a bug that causes duplicate records with same primary key
+        rows = rows + rows
+
     out = {"schema_version": rows[0].get("schema_version", 1), "rows": rows}
 
     # Partial write scenario: write half and crash.
