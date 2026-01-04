@@ -52,6 +52,19 @@ def main() -> None:
         df = df.select("id", "email", "country")
         _ = df.count()
 
+    # Data skew OOM scenario - fix by enabling AQE and proper partitioning
+    if scenario == "data_skew_oom":
+        # Enable Adaptive Query Execution to handle skewed data
+        spark.conf.set("spark.sql.adaptive.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        
+        # Simulate skewed data processing with proper handling
+        df = df.select("id", "email", "country")
+        # Use repartitioning to distribute data evenly
+        df = df.repartition(4, "country")
+        _ = df.count()
+
     # Emit a small proof artifact for debugging.
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     payload = {"scenario": scenario, "row_count": df.count()}
