@@ -37,11 +37,19 @@ def run(*, scenario: str, output_path: str) -> JobResult:
     """
     rows = _load_input_rows(scenario=scenario)
 
-    # Simulate flaky enrichment API behavior (rate limiting).
+    # Simulate flaky enrichment API behavior (rate limiting) with retry logic.
     if scenario == "api_flaky_429":
-        if random.random() < 0.6:
-            raise RuntimeError("Upstream enrichment API returned 429 Too Many Requests")
-        time.sleep(0.15)
+        max_retries = 5
+        for attempt in range(max_retries):
+            if random.random() < 0.6:
+                if attempt < max_retries - 1:
+                    backoff_time = 0.1 * (2 ** attempt)  # Exponential backoff
+                    time.sleep(backoff_time)
+                    continue
+                else:
+                    raise RuntimeError("Upstream enrichment API returned 429 Too Many Requests")
+            time.sleep(0.15)
+            break
 
     # Contract validation (shared lib). This is where schema drift shows up.
     validate_customer_rows(rows=rows)
