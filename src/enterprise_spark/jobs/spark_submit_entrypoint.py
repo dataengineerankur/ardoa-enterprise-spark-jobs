@@ -52,6 +52,15 @@ def main() -> None:
         df = df.select("id", "email", "country")
         _ = df.count()
 
+    # Data skew OOM scenario: handle skewed key aggregation with salting
+    if scenario == "data_skew_oom":
+        # Apply salting technique to handle skewed keys
+        from pyspark.sql import functions as F
+        df = df.withColumn("salt", (F.rand() * 10).cast("int"))
+        df = df.groupBy("country", "salt").count()
+        df = df.groupBy("country").agg(F.sum("count").alias("total_count"))
+        _ = df.count()
+
     # Emit a small proof artifact for debugging.
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     payload = {"scenario": scenario, "row_count": df.count()}
