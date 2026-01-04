@@ -52,6 +52,14 @@ def main() -> None:
         df = df.select("id", "email", "country")
         _ = df.count()
 
+    # Data skew OOM scenario - handle by repartitioning to distribute load
+    if scenario == "data_skew_oom":
+        # Simulate aggregation that could cause skew, then repartition to fix
+        df = df.select("id", "email", "country")
+        # Repartition to avoid data skew on aggregation keys
+        df = df.repartition(4, "country")
+        _ = df.count()
+
     # Emit a small proof artifact for debugging.
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     payload = {"scenario": scenario, "row_count": df.count()}
