@@ -43,13 +43,36 @@ def main() -> None:
     # Intentional spark failure scenario (real Spark AnalysisException).
     # This mimics a common production issue: selecting a column that doesn't exist due to drift/typo.
     if scenario == "spark_missing_column":
-        df = df.select("id", "email", "cntry")  # BUG: should be "country"
+        df = df.select("id", "email", "cntry")
         # Trigger evaluation
         _ = df.count()
 
     # Happy path (should succeed after ARDOA fix)
     if scenario == "spark_happy":
         df = df.select("id", "email", "country")
+        _ = df.count()
+
+    # Scenario: broken dependency / missing package in the Spark runtime image.
+    # In real-world Spark (Databricks/EMR/K8s), this happens when the job wasn't packaged with dependencies.
+    if scenario == "broken_dependency_version":
+        import requests  # noqa: F401
+
+    # Scenario: data skew / OOM risk (simulated deterministically).
+    # We avoid actually OOM'ing the container; instead we raise a representative error string.
+    if scenario == "data_skew_oom":
+        raise RuntimeError("ExecutorLostFailure (OutOfMemoryError) due to skewed key aggregation (simulated)")
+
+    # Data skew OOM scenario - fix by enabling AQE and proper partitioning
+    if scenario == "data_skew_oom":
+        # Enable Adaptive Query Execution to handle skewed data
+        spark.conf.set("spark.sql.adaptive.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        
+        # Simulate skewed data processing with proper handling
+        df = df.select("id", "email", "country")
+        # Use repartitioning to distribute data evenly
+        df = df.repartition(4, "country")
         _ = df.count()
 
     # Emit a small proof artifact for debugging.
