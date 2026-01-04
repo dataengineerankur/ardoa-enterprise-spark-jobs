@@ -28,7 +28,19 @@ def main() -> None:
     scenario = (args.scenario or "").strip() or "spark_missing_column"
     out_path = args.out
 
-    spark = SparkSession.builder.appName("enterprise_spark_submit_entrypoint").getOrCreate()
+    # Enable adaptive query execution for skew handling
+    builder = SparkSession.builder.appName("enterprise_spark_submit_entrypoint")
+    
+    # Apply skew mitigation configs when needed
+    if scenario == "data_skew_oom":
+        builder = (
+            builder.config("spark.sql.adaptive.enabled", "true")
+            .config("spark.sql.adaptive.skewJoin.enabled", "true")
+            .config("spark.sql.adaptive.skewJoin.skewedPartitionFactor", "5")
+            .config("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", "256MB")
+        )
+    
+    spark = builder.getOrCreate()
 
     # Synthetic input (enterprise-like envelope)
     rows: list[dict[str, Any]] = [
@@ -51,6 +63,13 @@ def main() -> None:
     if scenario == "spark_happy":
         df = df.select("id", "email", "country")
         _ = df.count()
+
+    # Data skew OOM scenario - demonstrates skew handling with AQE
+    if scenario == "data_skew_oom":
+        # Simulate aggregation that would cause skew without AQE
+        # With adaptive query execution enabled, this should succeed
+        df = df.groupBy("country").count()
+        _ = df.collect()
 
     # Emit a small proof artifact for debugging.
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
