@@ -43,13 +43,32 @@ def main() -> None:
     # Intentional spark failure scenario (real Spark AnalysisException).
     # This mimics a common production issue: selecting a column that doesn't exist due to drift/typo.
     if scenario == "spark_missing_column":
-        df = df.select("id", "email", "cntry")  # BUG: should be "country"
+        df = df.select("id", "email", "cntry")
         # Trigger evaluation
         _ = df.count()
 
     # Happy path (should succeed after ARDOA fix)
     if scenario == "spark_happy":
         df = df.select("id", "email", "country")
+        _ = df.count()
+
+    # Scenario: broken dependency / missing package in the Spark runtime image.
+    # In real-world Spark (Databricks/EMR/K8s), this happens when the job wasn't packaged with dependencies.
+    if scenario == "broken_dependency_version":
+        import requests  # noqa: F401
+
+    # Scenario: data skew / OOM risk (simulated deterministically).
+    # We avoid actually OOM'ing the container; instead we raise a representative error string.
+    if scenario == "data_skew_oom":
+        raise RuntimeError("ExecutorLostFailure (OutOfMemoryError) due to skewed key aggregation (simulated)")
+
+    # Data skew OOM scenario: handle skewed key aggregation with salting
+    if scenario == "data_skew_oom":
+        # Apply salting technique to handle skewed keys
+        from pyspark.sql import functions as F
+        df = df.withColumn("salt", (F.rand() * 10).cast("int"))
+        df = df.groupBy("country", "salt").count()
+        df = df.groupBy("country").agg(F.sum("count").alias("total_count"))
         _ = df.count()
 
     # Emit a small proof artifact for debugging.
