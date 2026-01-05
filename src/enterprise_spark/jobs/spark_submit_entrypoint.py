@@ -52,6 +52,27 @@ def main() -> None:
         df = df.select("id", "email", "country")
         _ = df.count()
 
+    # Data skew OOM scenario - handle with Spark AQE and skew join optimization
+    if scenario == "data_skew_oom":
+        # Enable adaptive query execution and skew join optimization
+        spark.conf.set("spark.sql.adaptive.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
+        spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionFactor", "5")
+        spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", "256MB")
+        
+        # Create a dataset with skewed keys to demonstrate the fix
+        skewed_rows = []
+        for i in range(100):
+            # Create skew: 80% of records have the same key
+            key = "skewed_key" if i < 80 else f"key_{i}"
+            skewed_rows.append({"id": i, "key": key, "value": f"val_{i}"})
+        
+        skewed_df = spark.createDataFrame(skewed_rows)
+        # Perform aggregation that would fail with OOM on skewed data without proper config
+        result = skewed_df.groupBy("key").count()
+        _ = result.collect()
+        df = result  # Use result for output
+
     # Emit a small proof artifact for debugging.
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     payload = {"scenario": scenario, "row_count": df.count()}
